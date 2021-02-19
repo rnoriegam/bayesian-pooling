@@ -1,0 +1,127 @@
+function [Pool_res,Std_res,Pds_outcome,Samples,Pprior] = Bayesiancutoff_3D_pool(m,Pd,g,Pid,Pfp,threshold)
+
+Np=m^3;
+
+Pds_outcome=[];
+Samples=[];
+Pprior=[];
+
+Npop=Np*3e4;
+Ntrials=round(Npop/Np);
+
+%threshold=0.4; %for result
+
+
+IDs=reshape([1:m^3],[m m m]);
+
+for trials=1:Ntrials
+
+    %set up the real samples, make a fraction undetectable
+samples=1*(rand([1 Np])<=Pd);
+dilution=(sqrt(-1)*(rand([1 Np])>g)); dilution=(ones([1 Np])-imag(dilution))+sqrt(-1)*imag(dilution);
+samples=samples.*dilution;
+
+sample_array=reshape(samples,[m m m ]);
+
+Dxy=1*(sum(real(sample_array),3)>0);
+Dxz=1*(sum(real(sample_array),2)>0);
+Dyz=1*(sum(real(sample_array),1)>0);
+
+%pooled test results
+Txy=Dxy.*(rand(size(Dxy))<=Pid)+(1-Dxy).*(rand(size(Dxy))<=Pfp);
+Txz=Dxz.*(rand(size(Dxz))<=Pid)+(1-Dxz).*(rand(size(Dxz))<=Pfp);
+Tyz=Dyz.*(rand(size(Dyz))<=Pid)+(1-Dyz).*(rand(size(Dyz))<=Pfp);
+
+Pd_prior=ceil((sum(sum(Txy))+sum(sum(Txz))+sum(sum(Tyz)))/3)/m^3;
+Pprior=[Pprior;ones([1 Np])*Pd_prior];
+Pd_outcomes=[];
+
+xy=sum(sum(sum(Txy)));
+xz=sum(sum(sum(Txz)));
+yz=sum(sum(sum(Tyz)));
+pos=[xy,xz,yz];
+
+face_orderings=[[1,2,3];[1,3,2];[2,1,3];[2,3,1];[3,1,2];[3,2,1]];
+
+for variant=1:6;
+    POS=pos(face_orderings(variant,:));
+    if (min((diff(POS,1,2)),[],2)>=0)
+        
+        Pd_array=ones(size(sample_array))*Pd_prior;
+        face_order=face_orderings(variant,:);
+        
+        for face=1:3;
+            
+            if face_order(face)==1
+                %use infor from Txy
+                for i=1:m
+                    for j=1:m
+                        x=cumprod(1-g*Pd_array(i,j,:)); x=x(numel(x));
+                        P_ijp=Pid+(Pfp-Pid)*x;
+                        if Txy(i,j)==1
+                            Pd_array(i,j,:)=Pd_array(i,j,:)*Pid/P_ijp;
+                        else
+                            Pd_array(i,j,:)=Pd_array(i,j,:)*(1-Pid)/(1-P_ijp);
+                        end
+                    end
+                end
+            end
+            
+            if face_order(face)==2
+                %use infor from Txz
+                for i=1:m
+                    for k=1:m
+                        x=cumprod(1-g*Pd_array(i,:,k)); x=x(numel(x));
+                        P_ijp=Pid+(Pfp-Pid)*x;
+                        if Txz(i,1,k)==1
+                            Pd_array(i,:,k)=Pd_array(i,:,k)*Pid/P_ijp;
+                        else
+                            Pd_array(i,:,k)=Pd_array(i,:,k)*(1-Pid)/(1-P_ijp);
+                        end
+                    end
+                end
+            end
+            
+            if face_order(face)==3
+                %use infor from Tyz
+                for j=1:m
+                    for k=1:m
+                        x=cumprod(1-g*Pd_array(:,j,k)); x=x(numel(x));
+                        P_ijp=Pid+(Pfp-Pid)*x;
+                        if Tyz(1,j,k)==1
+                            Pd_array(:,j,k)=Pd_array(:,j,k)*Pid/P_ijp;
+                        else
+                            Pd_array(:,j,k)=Pd_array(:,j,k)*(1-Pid)/(1-P_ijp);
+                        end
+                    end
+                end
+            end
+        end
+        
+        Pd_outcomes=[Pd_outcomes;reshape(Pd_array, [1 m^3])];
+    end
+end
+
+Pds_outcome=[Pds_outcome, max(round(repmat(Pd_outcomes,[2 1]),2))];
+Samples=[Samples, reshape(abs(samples), [1 m^3])];
+
+end
+
+
+Pool_True_pos=sum((Samples>0).*(Pds_outcome>=threshold));
+Pool_False_neg=sum((Samples>0).*(Pds_outcome<threshold));
+Pool_False_pos=sum((Samples<1).*(Pds_outcome>=threshold));
+Pool_True_neg=sum((Samples<1).*(Pds_outcome<threshold));
+
+
+%%now compare to a 1:1 scheme screening the same population
+Tstd=Samples.*(rand(size(Samples))<=Pid)+(1-Samples).*(rand(size(Samples))<=Pfp);
+
+Std_True_pos=sum((Samples>0).*(Tstd>=.5));
+Std_False_neg=sum((Samples>0).*(Tstd<.5));
+Std_True_neg=sum((Samples<1).*(Tstd<.5));
+Std_False_pos=sum((Samples<1).*(Tstd>=.5));
+
+
+Pool_res=[Pool_True_pos,Pool_False_neg,Pool_False_pos,Pool_True_neg];
+Std_res=[Std_True_pos,Std_False_neg,Std_False_pos,Std_True_neg];
