@@ -1,0 +1,157 @@
+function [Pool_res,Std_res,Pds_outcome,Samples,Pprior] = Bayesiancutoff_4D_pool(m,Pd,g,Pid,Pfp,threshold)
+
+Np=m^4;
+
+Pds_outcome=[];
+Samples=[];
+Pprior=[];
+
+Npop=Np*3e4;
+Ntrials=round(Npop/Np);
+
+%threshold=0.5; %for result
+
+
+IDs=reshape([1:m^4],[m m m m]);
+
+for trials=1:Ntrials
+    
+    %set up the real samples, make a fraction undetectable
+    samples=1*(rand([1 Np])<=Pd);
+    dilution=(sqrt(-1)*(rand([1 Np])>g)); dilution=(ones([1 Np])-imag(dilution))+sqrt(-1)*imag(dilution);
+    samples=samples.*dilution;
+    
+    sample_array=reshape(samples,[m m m m]);
+    
+    D4=1*(sum(real(sample_array),4)>0);
+    D3=1*(sum(real(sample_array),3)>0);
+    D2=1*(sum(real(sample_array),2)>0);
+    D1=1*(sum(real(sample_array),1)>0);
+    
+    T4=D4.*(rand(size(D4))<=Pid)+(1-D4).*(rand(size(D4))<=Pfp);
+    T3=D3.*(rand(size(D3))<=Pid)+(1-D3).*(rand(size(D3))<=Pfp);
+    T2=D2.*(rand(size(D2))<=Pid)+(1-D2).*(rand(size(D2))<=Pfp);
+    T1=D1.*(rand(size(D1))<=Pid)+(1-D1).*(rand(size(D1))<=Pfp);
+    
+    Pd_prior=ceil((sum(sum(sum(T1)))+sum(sum(sum(T2)))+sum(sum(sum(T3)))+sum(sum(sum(T4))))/4)/m^4;
+    Pprior=[Pprior;ones([1 Np])*Pd_prior];
+    Pd_outcomes=[];
+    
+    P123=sum(sum(sum(sum(T4))));
+    P124=sum(sum(sum(sum(T3))));
+    P134=sum(sum(sum(sum(T2))));
+    P234=sum(sum(sum(sum(T1))));
+    pos=[P123,P124,P134,P234];
+    
+    face_orderings=[[1,2,3,4];[1,2,4,3];[1,3,2,4];[1,3,4,2];[1,4,2,3];[1,4,3,2];...
+        [2,1,3,4];[2,1,4,3];[2,3,1,4];[2,3,4,1];[2,4,1,3];[2,4,3,1];...
+        [3,1,2,4];[3,1,4,2];[3,2,1,4];[3,2,4,1];[3,4,1,2];[3,4,2,1];...
+        [4,1,2,3];[4,1,3,2];[4,2,1,3];[4,2,3,1];[4,3,1,2];[4,3,2,1]];
+    
+    for variant=1:24;
+        POS=pos(face_orderings(variant,:));
+        if (min((diff(POS,1,2)),[],2)>=0)
+            
+            Pd_array=ones(size(sample_array))*Pd_prior;
+            face_order=face_orderings(variant,:);
+            
+            for face=1:4;
+                
+                if face_order(face)==1
+                    %use infor from T4
+                    for i=1:m
+                        for j=1:m
+                            for k=1:m
+                                x=cumprod(1-g*Pd_array(i,j,k,:)); x=x(numel(x));
+                                P_ijp=Pid+(Pfp-Pid)*x;
+                                if T4(i,j,k)==1
+                                    Pd_array(i,j,k,:)=Pd_array(i,j,k,:)*Pid/P_ijp;
+                                else
+                                    Pd_array(i,j,k,:)=Pd_array(i,j,k,:)*(1-Pid)/(1-P_ijp);
+                                end
+                            end
+                        end
+                    end
+                end
+                
+                if face_order(face)==2
+                    %use infor from T3
+                    for i=1:m
+                        for j=1:m
+                            for k=1:m
+                                x=cumprod(1-g*Pd_array(i,j,:,k)); x=x(numel(x));
+                                P_ijp=Pid+(Pfp-Pid)*x;
+                                if T3(i,j,1,k)==1
+                                    Pd_array(i,j,:,k)=Pd_array(i,j,:,k)*Pid/P_ijp;
+                                else
+                                    Pd_array(i,j,:,k)=Pd_array(i,j,:,k)*(1-Pid)/(1-P_ijp);
+                                end
+                            end
+                        end
+                    end
+                end
+                
+                if face_order(face)==3
+                    %use infor from T2
+                    for i=1:m
+                        for j=1:m
+                            for k=1:m
+                                x=cumprod(1-g*Pd_array(i,:,j,k)); x=x(numel(x));
+                                P_ijp=Pid+(Pfp-Pid)*x;
+                                if T2(i,1,j,k)==1
+                                    Pd_array(i,:,j,k)=Pd_array(i,:,j,k)*Pid/P_ijp;
+                                else
+                                    Pd_array(i,:,j,k)=Pd_array(i,:,j,k)*(1-Pid)/(1-P_ijp);
+                                end
+                            end
+                        end
+                    end
+                end
+                
+                if face_order(face)==4
+                    %use infor from T1
+                    for i=1:m
+                        for j=1:m
+                            for k=1:m
+                                x=cumprod(1-g*Pd_array(:,i,j,k)); x=x(numel(x));
+                                P_ijp=Pid+(Pfp-Pid)*x;
+                                if T1(1,i,j,k)==1
+                                    Pd_array(:,i,j,k)=Pd_array(:,i,j,k)*Pid/P_ijp;
+                                else
+                                    Pd_array(:,i,j,k)=Pd_array(:,i,j,k)*(1-Pid)/(1-P_ijp);
+                                end
+                            end
+                        end
+                    end
+                end
+                
+                
+            end
+            
+            Pd_outcomes=[Pd_outcomes;reshape(Pd_array, [1 m^4])];
+        end
+    end
+    
+    Pds_outcome=[Pds_outcome, max(round(repmat(Pd_outcomes,[2 1]),2))];
+    Samples=[Samples, reshape(abs(samples), [1 m^4])];
+    
+end
+
+
+Pool_True_pos=sum((Samples>0).*(Pds_outcome>=threshold));
+Pool_False_neg=sum((Samples>0).*(Pds_outcome<threshold));
+Pool_False_pos=sum((Samples<1).*(Pds_outcome>=threshold));
+Pool_True_neg=sum((Samples<1).*(Pds_outcome<threshold));
+
+
+%%now compare to a 1:1 scheme screening the same population
+Tstd=Samples.*(rand(size(Samples))<=Pid)+(1-Samples).*(rand(size(Samples))<=Pfp);
+
+Std_True_pos=sum((Samples>0).*(Tstd>=.5));
+Std_False_neg=sum((Samples>0).*(Tstd<.5));
+Std_True_neg=sum((Samples<1).*(Tstd<.5));
+Std_False_pos=sum((Samples<1).*(Tstd>=.5));
+
+
+Pool_res=[Pool_True_pos,Pool_False_neg,Pool_False_pos,Pool_True_neg];
+Std_res=[Std_True_pos,Std_False_neg,Std_False_pos,Std_True_neg];
