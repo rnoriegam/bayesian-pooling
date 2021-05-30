@@ -1,4 +1,13 @@
-function [Pool_res,Std_res,Pds_outcome,Samples,Pprior] = Bayesiancutoff_4D_pool(m,Pd,g,Pid,Pfp,threshold)
+% Code below built and used on Matlab
+
+% Details in: 
+% Sobczyk J, Pyne MT, Barker A, Mayer J, Hanson KE, Samore MH, Noriega R. 
+% Efficient and effective single-step screening of individual samples for SARS-CoV-2 RNA using multi-dimensional pooling and Bayesian inference.
+% J. R. Soc. Interface, 20210155 (2021). https://doi.org/10.1098/rsif.2021.0155
+
+
+
+function [Pool_res,Std_res,Pds_outcome,Samples,Pprior] = Bayesian_4D_pool(m,Pd,g,Pid,Pfp,threshold)
 
 Np=m^4;
 
@@ -9,14 +18,11 @@ Pprior=[];
 Npop=Np*3e4;
 Ntrials=round(Npop/Np);
 
-%threshold=0.5; %for result
-
-
 IDs=reshape([1:m^4],[m m m m]);
 
 for trials=1:Ntrials
     
-    %set up the real samples, make a fraction undetectable
+    % set up the real samples, make a fraction undetectable
     samples=1*(rand([1 Np])<=Pd);
     dilution=(sqrt(-1)*(rand([1 Np])>g)); dilution=(ones([1 Np])-imag(dilution))+sqrt(-1)*imag(dilution);
     samples=samples.*dilution;
@@ -34,7 +40,7 @@ for trials=1:Ntrials
     T1=D1.*(rand(size(D1))<=Pid)+(1-D1).*(rand(size(D1))<=Pfp);
     
     Pd_prior=ceil((sum(sum(sum(T1)))+sum(sum(sum(T2)))+sum(sum(sum(T3)))+sum(sum(sum(T4))))/4)/m^4;
-    Pprior=[Pprior;ones([1 Np])*Pd_prior];
+    Pprior=[Pprior,ones([1 Np])*Pd_prior];
     Pd_outcomes=[];
     
     P123=sum(sum(sum(sum(T4))));
@@ -144,7 +150,7 @@ Pool_False_pos=sum((Samples<1).*(Pds_outcome>=threshold));
 Pool_True_neg=sum((Samples<1).*(Pds_outcome<threshold));
 
 
-%%now compare to a 1:1 scheme screening the same population
+% now compare to a 1:1 scheme screening the same population
 Tstd=Samples.*(rand(size(Samples))<=Pid)+(1-Samples).*(rand(size(Samples))<=Pfp);
 
 Std_True_pos=sum((Samples>0).*(Tstd>=.5));
