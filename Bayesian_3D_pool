@@ -1,3 +1,12 @@
+% Code below built and used on Matlab
+
+% Details in: 
+% Sobczyk J, Pyne MT, Barker A, Mayer J, Hanson KE, Samore MH, Noriega R. 
+% Efficient and effective single-step screening of individual samples for SARS-CoV-2 RNA using multi-dimensional pooling and Bayesian inference.
+% J. R. Soc. Interface, 20210155 (2021). https://doi.org/10.1098/rsif.2021.0155
+
+
+
 function [Pool_res,Std_res,Pds_outcome,Samples,Pprior] = Bayesiancutoff_3D_pool(m,Pd,g,Pid,Pfp,threshold)
 
 Np=m^3;
@@ -9,14 +18,11 @@ Pprior=[];
 Npop=Np*3e4;
 Ntrials=round(Npop/Np);
 
-%threshold=0.4; %for result
-
-
 IDs=reshape([1:m^3],[m m m]);
 
 for trials=1:Ntrials
 
-    %set up the real samples, make a fraction undetectable
+    % set up the real samples, make a fraction undetectable
 samples=1*(rand([1 Np])<=Pd);
 dilution=(sqrt(-1)*(rand([1 Np])>g)); dilution=(ones([1 Np])-imag(dilution))+sqrt(-1)*imag(dilution);
 samples=samples.*dilution;
@@ -27,13 +33,14 @@ Dxy=1*(sum(real(sample_array),3)>0);
 Dxz=1*(sum(real(sample_array),2)>0);
 Dyz=1*(sum(real(sample_array),1)>0);
 
-%pooled test results
+% pooled test results
 Txy=Dxy.*(rand(size(Dxy))<=Pid)+(1-Dxy).*(rand(size(Dxy))<=Pfp);
 Txz=Dxz.*(rand(size(Dxz))<=Pid)+(1-Dxz).*(rand(size(Dxz))<=Pfp);
 Tyz=Dyz.*(rand(size(Dyz))<=Pid)+(1-Dyz).*(rand(size(Dyz))<=Pfp);
 
 Pd_prior=ceil((sum(sum(Txy))+sum(sum(Txz))+sum(sum(Tyz)))/3)/m^3;
-Pprior=[Pprior;ones([1 Np])*Pd_prior];
+%Pd_prior=Pd_prior+(((1-Pid)^3)*(Pd_prior==0));
+Pprior=[Pprior,ones([1 Np])*Pd_prior];
 Pd_outcomes=[];
 
 xy=sum(sum(sum(Txy)));
@@ -114,7 +121,7 @@ Pool_False_pos=sum((Samples<1).*(Pds_outcome>=threshold));
 Pool_True_neg=sum((Samples<1).*(Pds_outcome<threshold));
 
 
-%%now compare to a 1:1 scheme screening the same population
+% now compare to a 1:1 scheme screening the same population
 Tstd=Samples.*(rand(size(Samples))<=Pid)+(1-Samples).*(rand(size(Samples))<=Pfp);
 
 Std_True_pos=sum((Samples>0).*(Tstd>=.5));
