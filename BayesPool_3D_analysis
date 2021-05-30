@@ -1,12 +1,22 @@
+% Code below built and used on Matlab
+
+% Details in: 
+% Sobczyk J, Pyne MT, Barker A, Mayer J, Hanson KE, Samore MH, Noriega R. 
+% Efficient and effective single-step screening of individual samples for SARS-CoV-2 RNA using multi-dimensional pooling and Bayesian inference.
+% J. R. Soc. Interface, 20210155 (2021). https://doi.org/10.1098/rsif.2021.0155
+
+
+
 function [Pd_outcome,results] = BayesPool_3D_analysis(g,Pid,Pfp,Pool_tests)
 
 m=sqrt(numel(Pool_tests)/3);
 
-threshold=0.4; %for result
+threshold=0.4; % for result
+
 IDs=reshape([1:m^3],[m m m]);
 
-Pd_prior=ceil(sum(Pool_tests)/3)/m^3; %.1+.05*randn();
-%our starting guess is the same for all samples
+% our starting guess is the same for all samples
+Pd_prior=ceil(sum(Pool_tests)/3)/m^3;
 Pd_prior=ones([m m m])*Pd_prior;
 
 Pd_outcomes=[];
@@ -23,7 +33,6 @@ xy=sum(sum(sum(Txy)));
 xz=sum(sum(sum(Txz)));
 yz=sum(sum(sum(Tyz)));
 pos=[xy,xz,yz];
-%[~,face_order]=sort([xy,xz,yz]);
 
 face_orderings=[[1,2,3];[1,3,2];[2,1,3];[2,3,1];[3,1,2];[3,2,1]];
 
